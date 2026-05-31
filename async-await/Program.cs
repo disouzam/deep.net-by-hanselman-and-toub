@@ -14,11 +14,12 @@ for(int i = 0; i < 100; i++)
     }));
 }
 
-foreach(var t in tasks)
-{
-    t.Wait();
-}
+//foreach(var t in tasks)
+//{
+//    t.Wait();
+//}
 
+MyTask.WhenAll(tasks).Wait();
 Console.WriteLine("Execution completed. Press any key to exit.");
 Console.ReadLine();
 
@@ -135,6 +136,37 @@ class MyTask
         });
 
         return t;
+    }
+
+    public static MyTask WhenAll(List<MyTask> tasks)
+    {
+        MyTask t = new MyTask();
+
+        if(tasks.Count == 0)
+        {
+            t.SetResult();
+            return t;
+        }
+        else
+        {
+            int remaining = tasks.Count;
+
+            Action continuation = () =>
+            {
+                if(Interlocked.Decrement(ref remaining) == 0)
+                {
+                    // TODO: Handle exceptions from individual tasks and aggregate them if necessary
+                    t.SetResult();
+                }
+            };
+
+            foreach(var task in tasks)
+            {
+                task.ContinueWith(continuation);
+            }
+
+            return t;
+        }
     }
 }
 
