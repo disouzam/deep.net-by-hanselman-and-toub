@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 
 AsyncLocal<int> myValue = new AsyncLocal<int>();
 for(int i = 0; i < 1000; i++)
@@ -16,15 +17,96 @@ Console.ReadLine();
 
 class MyTask
 {
-    public bool IsComppleted { get; }
+    private bool _completed;
 
-    public void SetResult() { }
+    private Exception? _exception;
 
-    public void SetException(Exception ex) { }
+    private Action? _continuation;
 
-    public void Wait() { }
+    private ExecutionContext? _context;
 
-    public void ContinueWith(Action action) { }
+    public bool IsCompleted
+    {
+        get
+        {
+            lock(this)
+            {
+                return _completed;
+            }
+        }
+    }
+
+    public void SetResult() => Complete(null);
+
+    public void SetException(Exception exception) => Complete(exception);
+
+    private void Complete(Exception? exception)
+    {
+        lock(this)
+        {
+            if(_completed)
+            {
+                throw new InvalidOperationException("Task is already completed.");
+            }
+
+            _completed = true;
+            _exception = exception;
+
+            if(_continuation is not null)
+            {
+                MyThreadPool.QueueUserWorkItem(delegate
+                {
+                    if(_context is null)
+                    {
+                        _continuation();
+                    }
+                    else
+                    {
+                        ExecutionContext.Run(_context, state => ((Action)state!).Invoke(), _continuation);
+                    }
+                }
+                );
+            }
+        }
+    }
+
+    public void Wait()
+    {
+        ManualResetEventSlim? mres = null;
+
+        lock(this)
+        {
+            if(!_completed)
+            {
+                mres = new ManualResetEventSlim();
+                ContinueWith(mres.Set);
+            }
+        }
+
+        mres?.Wait();
+
+        if(_exception is not null)
+        {
+            ExceptionDispatchInfo.Throw(_exception);
+            //throw new AggregateException(_exception);
+        }
+    }
+
+    public void ContinueWith(Action action)
+    {
+        lock(this)
+        {
+            if(_completed)
+            {
+                MyThreadPool.QueueUserWorkItem(action);
+            }
+            else
+            {
+                _continuation = action;
+                _context = ExecutionContext.Capture();
+            }
+        }
+    }
 }
 
 static class MyThreadPool
