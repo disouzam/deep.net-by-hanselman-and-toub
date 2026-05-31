@@ -2,14 +2,21 @@
 using System.Runtime.ExceptionServices;
 
 AsyncLocal<int> myValue = new AsyncLocal<int>();
-for(int i = 0; i < 1000; i++)
+List<MyTask> tasks = new List<MyTask>();
+
+for(int i = 0; i < 100; i++)
 {
     myValue.Value = i;
-    MyThreadPool.QueueUserWorkItem(delegate
+    tasks.Add(MyTask.Run(delegate
     {
         Console.WriteLine($"Starting a thread...{myValue.Value}");
         Thread.Sleep(100);
-    });
+    }));
+}
+
+foreach(var t in tasks)
+{
+    t.Wait();
 }
 
 Console.WriteLine("Execution completed. Press any key to exit.");
@@ -106,6 +113,28 @@ class MyTask
                 _context = ExecutionContext.Capture();
             }
         }
+    }
+
+    public static MyTask Run(Action action)
+    {
+        MyTask t = new MyTask();
+
+        MyThreadPool.QueueUserWorkItem(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch(Exception e)
+            {
+                t.SetException(e);
+                return;
+            }
+
+            t.SetResult();
+        });
+
+        return t;
     }
 }
 
