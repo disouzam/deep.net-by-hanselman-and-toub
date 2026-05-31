@@ -16,22 +16,29 @@ Console.ReadLine();
 
 static class MyThreadPool
 {
-    private static readonly BlockingCollection<Action> _workItems = new BlockingCollection<Action>();
+    private static readonly BlockingCollection<(Action, ExecutionContext?)> _workItems = new BlockingCollection<(Action, ExecutionContext?)>();
 
-    public static void QueueUserWorkItem(Action action) => _workItems.Add(action);
+    public static void QueueUserWorkItem(Action action) => _workItems.Add((action, ExecutionContext.Capture()));
 
     static MyThreadPool()
     {
-        for (int i = 0; i < Environment.ProcessorCount; i++)
+        for(int i = 0; i < Environment.ProcessorCount; i++)
         {
-            new Thread(() => 
+            new Thread(() =>
             {
-                while (true) 
+                while(true)
                 {
-                    Action workItem = _workItems.Take();
-                    workItem();
+                    (Action workItem, ExecutionContext? context) = _workItems.Take();
+                    if(context is null)
+                    {
+                        workItem();
+                    }
+                    else
+                    {
+                        ExecutionContext.Run(context, state => ((Action)state!).Invoke(), workItem);
+                    }
                 }
-            }) 
+            })
             { IsBackground = true }.Start();
         }
     }
