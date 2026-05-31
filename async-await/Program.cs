@@ -14,6 +14,19 @@ for(int i = 0; i < 1000; i++)
 Console.WriteLine("Execution completed. Press any key to exit.");
 Console.ReadLine();
 
+class MyTask
+{
+    public bool IsComppleted { get; }
+
+    public void SetResult() { }
+
+    public void SetException(Exception ex) { }
+
+    public void Wait() { }
+
+    public void ContinueWith(Action action) { }
+}
+
 static class MyThreadPool
 {
     private static readonly BlockingCollection<(Action, ExecutionContext?)> _workItems = new BlockingCollection<(Action, ExecutionContext?)>();
