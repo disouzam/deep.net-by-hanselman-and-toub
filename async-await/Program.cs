@@ -1,13 +1,13 @@
 ﻿using System.Collections.Concurrent;
 
 AsyncLocal<int> myValue = new AsyncLocal<int>();
-for (int i = 0; i < 1000; i++)
+for(int i = 0; i < 1000; i++)
 {
     myValue.Value = i;
     MyThreadPool.QueueUserWorkItem(delegate
     {
         Console.WriteLine($"Starting a thread...{myValue.Value}");
-        Thread.Sleep(10);
+        Thread.Sleep(100);
     });
 }
 
